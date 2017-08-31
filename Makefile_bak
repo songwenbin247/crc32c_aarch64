@@ -1,0 +1,39 @@
+ifeq ($(SRCDIR),)
+SRCDIR := .
+endif
+
+VPATH := $(SRCDIR)
+
+ifneq ($(wildcard config-host.mak),)
+all:
+include config-host.mak
+config-host-mak: configure
+	@echo $@ is out-of-date, running configure
+	@sed -n "/.*Configured with/s/[^:]*: //p" $@ | sh
+else
+config-host.mak:
+ifneq ($(MAKECMDGOALS),clean)
+	@echo "Running configure for you..."
+	@./configure
+	@echo $(CFLAGS)
+endif
+all:
+include config-host.mak
+endif
+
+CFLAGS += -O3
+OBJS = $(SOURCE:.c=.o)
+-include $(OBJS:.o=.d)
+
+CRC32C_OBJ = Michael_crc32c.o fio_crc32c.o
+TEST_OBJ = test.o
+
+
+$(TEST_OBJ): $(CRC32C_OBJ)
+#	$(QUIET_LINK)$(CC) $(LDFLAGS) $(CFLAGS) -o $@
+
+
+
+
+
+

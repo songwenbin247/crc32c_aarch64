@@ -1,0 +1,162 @@
+#!/bin/sh
+
+config_host_mak="config-host.mak"
+config_host_h="config-host.h"
+# set temporary file name
+if test ! -z "$TMPDIR" ; then
+    TMPDIR1="${TMPDIR}"
+elif test ! -z "$TEMPDIR" ; then
+    TMPDIR1="${TEMPDIR}"
+else
+    TMPDIR1="/tmp"
+fi
+cc=gcc
+TMPC="${TMPDIR1}/fio-conf-${RANDOM}-$$-${RANDOM}.c"
+TMPO="${TMPDIR1}/fio-conf-${RANDOM}-$$-${RANDOM}.o"
+TMPE="${TMPDIR1}/fio-conf-${RANDOM}-$$-${RANDOM}.exe"
+
+# NB: do not call "exit" in the trap handler; this is buggy with some shells;
+# see <1285349658-3122-1-git-send-email-loic.minier@linaro.org>
+trap "rm -f $TMPC $TMPO $TMPE" EXIT INT QUIT TERM
+
+# Print result for each configuration test
+print_config() {
+  printf "%-30s%s\n" "$1" "$2"
+}
+
+do_cc() {
+    # Run the compiler, capturing its output to the log.
+    echo $cc "$@" >> config.log
+    $cc "$@" >> config.log 2>&1 || return $?
+    # Test passed. If this is an --enable-werror build, rerun
+    # the test with -Werror and bail out if it fails. This
+    # makes warning-generating-errors in configure test code
+    # obvious to developers.
+    if test "$werror" != "yes"; then
+        return 0
+    fi
+    # Don't bother rerunning the compile if we were already using -Werror
+    case "$*" in
+        *-Werror*)
+           return 0
+        ;;
+    esac
+    echo $cc -Werror "$@" >> config.log
+    $cc -Werror "$@" >> config.log 2>&1 && return $?
+    echo "ERROR: configure test passed without -Werror but failed with -Werror."
+    echo "This is probably a bug in the configure script. The failing command"
+    echo "will be at the bottom of config.log."
+    fatal "You can run configure with --disable-werror to bypass this check."
+}
+
+compile_object() {
+  do_cc $CFLAGS -c -o $TMPO $TMPC
+}
+
+check_define() {
+  cat > $TMPC <<EOF
+#if !defined($1)
+#error $1 not defined
+#endif
+int main(void)
+{
+  return 0;
+}
+EOF
+  compile_object
+}
+
+fatal() {
+  echo $@
+  echo "Configure failed, check config.log and/or the above output"
+  rm -rf $config_host_mak
+  rm -rf $config_host_h
+  exit 1
+}
+
+compile_prog() {
+  local_cflags="$1"
+  local_ldflags="$2 $LIBS"
+  echo "Compiling test case $3" >> config.log
+  do_cc $CFLAGS $local_cflags -o $TMPE $TMPC $LDFLAGS $local_ldflags
+}
+
+feature_not_found() {
+  feature=$1
+  packages=$2
+
+  echo "ERROR"
+  echo "ERROR: User requested feature $feature"
+  if test ! -z "$packages" ; then
+    echo "ERROR: That feature needs $packages installed"
+  fi
+  echo "ERROR: configure was not able to find it"
+  fatal "ERROR"
+}
+
+#if test ! -z "$cpu" ; then
+  # command line argument
+  :
+
+if check_define __aarch64__ ; then
+  cpu="aarch64"
+else
+  cpu=`uname -m`
+fi
+# Normalise host CPU name and set ARCH.
+case "$cpu" in
+  ia64|ppc|ppc64|s390|s390x|sparc64)
+    cpu="$cpu"
+  ;;
+  i386|i486|i586|i686|i86pc|BePC)
+    cpu="x86"
+  ;;
+  x86_64|amd64)
+    cpu="x86_64"
+  ;;
+  armv*b|armv*l|arm)
+    cpu="arm"
+  ;;
+  aarch64)
+    cpu="arm64"
+  ;;
+  hppa|parisc|parisc64)
+    cpu="hppa"
+  ;;
+  mips*)
+    cpu="mips"
+  ;;
+  sparc|sun4[cdmuv])
+    cpu="sparc"
+  ;;
+  *)
+  echo "Unknown CPU"
+  ;;
+esac
+
+if test "$cpu" != "arm64"; then
+  fatal "the host must be aarch64"
+fi
+
+# check march=armv8-a+crc+crypto
+if test "$march_armv8_a_crc_crypto" != "yes" ; then
+  march_armv8_a_crc_crypto="no"
+fi
+if test "$cpu" = "arm64" ; then
+  cat > $TMPC <<EOF
+#include <sys/auxv.h>
+#include <arm_acle.h>
+#include <arm_neon.h>
+
+int main(void)
+{
+  return 0;
+}
+EOF
+  if compile_prog "-march=armv8-a+crc+crypto" "" ""; then
+    march_armv8_a_crc_crypto="yes"
+    CFLAGS="$CFLAGS -march=armv8-a+crc+crypto -DARCH_HAVE_CRC_CRYPTO"
+  fi
+fi
+print_config "march_armv8_a_crc_crypto" "$march_armv8_a_crc_crypto"
+
