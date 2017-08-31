@@ -155,8 +155,8 @@ int main(void)
 EOF
   if compile_prog "-march=armv8-a+crc+crypto" "" ""; then
     march_armv8_a_crc_crypto="yes"
-    CFLAGS="$CFLAGS -march=armv8-a+crc+crypto -DARCH_HAVE_CRC_CRYPTO"
+    CFLAGS="$CFLAGS -march=armv8-a+crc+crypto  -DHAVE_ARMV8_CRC_CRYPTO_INTRINSICS -DHAVE_ARMV8_CRYPTO"
   fi
 fi
 print_config "march_armv8_a_crc_crypto" "$march_armv8_a_crc_crypto"
-
+echo "CFLAGS+=$CFLAGS" >> $config_host_mak

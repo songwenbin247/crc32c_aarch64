@@ -103,7 +103,7 @@ uint32_t ceph_crc32c_aarch64(uint32_t crc, unsigned char const *buffer, unsigned
 		/* crc done "by 3" for fixed input block size of 1024 bytes */
 		while ((length -= 1024) >= 0) {
 			/* Prefetch data for following block to avoid cache miss */
-			PREF1KL2(1024*3);
+//			PREF1KL2(1024*3);
 			/* Do first 8 bytes here for better pipelining */
 			crc0 = __crc32cd(crc, *(const uint64_t *)buffer);
 			crc1 = 0;
@@ -121,7 +121,7 @@ uint32_t ceph_crc32c_aarch64(uint32_t crc, unsigned char const *buffer, unsigned
 
 			buffer += 42*3*sizeof(uint64_t);
 			/* Prefetch data for following block to avoid cache miss */
-			PREF1KL1(1024);
+//			PREF1KL1(1024);
 
 			/* Merge crc0 and crc1 into crc2
 			   crc1 multiply by K2
